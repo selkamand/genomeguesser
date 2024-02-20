@@ -1,36 +1,33 @@
 use clap::{command, Arg};
 use core::fmt;
 use std::string::String;
-
+use colored::Colorize;
 use csv::StringRecord;
 
 //type VarRecord = (String, usize, String);
 type VarRecord = std::collections::HashMap<String, String>;
 
-// Commandline API
-// #[derive(Parser)]
-// #[command(version, about, long_about = None)]
-// struct Cli {
-//     variants: std::path::PathBuf,
-//     genomes: std::path::PathBuf,
-// }
-
+#[derive(Clone)]
 enum Coordinate {
     Zero,   // Zero-Based coordinate system
     One,    // One-based coordinate system
     Unsure, // Unsure
 }
 
+const SHRUGGING_MAN: &str = "¯\\_(ツ)_/¯";
+const EQUALS_HEADER: &str = "================================";
+
 impl fmt::Display for Coordinate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Coordinate::Zero => write!(f, "0-based"),
-            Coordinate::One => write!(f, "1-based"),
-            Coordinate::Unsure => write!(f, "Unsure"),
+            Coordinate::Zero => write!(f, "{}", "0-based ✅".bold().green()),
+            Coordinate::One => write!(f, "{}", "1-based ✅".bold().green()),
+            Coordinate::Unsure => write!(f, "{}" ,format!("{} {}",SHRUGGING_MAN.bold(), "(Unclear)").yellow()),
         }
     }
 }
 
+#[derive(Clone)]
 enum RefGenomeMatches {
     Yes,    // Zero-Based coordinate system
     No,     // One-based coordinate system
@@ -40,11 +37,82 @@ enum RefGenomeMatches {
 impl fmt::Display for RefGenomeMatches {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RefGenomeMatches::Yes => write!(f, "✅"),
-            RefGenomeMatches::No => write!(f, "❌"),
-            RefGenomeMatches::Unsure => write!(f, "Unsure"),
+            RefGenomeMatches::Yes => write!(f, "{}", "Perfectly aligns ✅".bold().green()),
+            RefGenomeMatches::No => write!(f, "{}", "No, Ref mismatches found ❌".bold().red()),
+            RefGenomeMatches::Unsure => write!(f, "{}", format!("{} {}",SHRUGGING_MAN.bold(), "(Unclear)").yellow()),
         }
     }
+}
+
+fn assess_ref_genomes_support(path_genomes: Vec<String>, path_variants: &str) -> String {
+
+    
+    let results: Vec<(String, RefGenomeMatches, Coordinate)> = path_genomes.iter().map(|genome| { assess_ref_genome_support(path_variants, genome) }).collect();
+    
+    let genome_matches: Vec<RefGenomeMatches> = results.iter().map(|tup| tup.1.clone() ).collect();
+    let results_coord: Vec<Coordinate> = results.iter().map(|tup: &(String, RefGenomeMatches, Coordinate)| tup.2.clone() ).collect();
+
+
+    let ref_genome_matched: Vec<bool> = genome_matches.iter().map(|ref_match| match ref_match{
+        RefGenomeMatches::Yes => true,
+        RefGenomeMatches::No => false,
+        RefGenomeMatches::Unsure => false}
+    ).collect();
+
+    let num_matches = ref_genome_matched.iter().filter(|x| **x).count();
+    let mut final_result = "Unsure";
+
+    if num_matches == 0{
+        final_result = "no matches";
+    }
+    else if num_matches == 1{
+        final_result = "1 match";
+    }
+    else if num_matches > 1{
+        final_result = "Ambiguous, multiple matches";
+    }
+
+    // Collect Genome Names
+    let matched_genome_name: String;
+    let matched_coord: String;
+    let genome_names: Vec<String> = path_genomes.iter().map(|genome_path| {
+        std::path::Path::new(genome_path.to_string().as_str())
+            .file_name().map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| panic!("Failed to parse genome path as filepath"))
+    }).collect();
+    
+    // 
+    if final_result == "1 match"{
+        let index_of_matched = ref_genome_matched.iter().enumerate()
+        .find_map(|(i, &value)| if value { Some(i) } else { None })
+        .expect("No match found, but expected one match");
+
+    // Access the matched genome name safely
+    matched_genome_name = genome_names.get(index_of_matched).unwrap().to_string();
+    matched_coord = results_coord.get(index_of_matched).unwrap().to_string();
+    
+
+    }
+    else if final_result == "Ambiguous, multiple matches" {
+        matched_genome_name = r"¯\_(ツ)_/¯ (Variant file works equally well for multiple variants)".to_string();
+        matched_coord = Coordinate::Unsure.to_string();
+    }
+    else if final_result == "no matches" {
+        matched_genome_name = r"¯\_(ツ)_/¯ (No unambiguous matches to any reference genome)".to_string();
+        matched_coord = Coordinate::Unsure.to_string();
+    }
+    else  {
+        panic!("Should never see this. If you are developer has added 'final_result' possibilities and not accounted for them")
+    }
+
+    //Print Details
+    println!("\n\n{EQUALS_HEADER}\n{}\n{EQUALS_HEADER}", "Final Summary".bold().blue());
+    println!("Matched reference genome: {} ✅", matched_genome_name.bold().bright_magenta());
+    println!("Coordinate system genome: {}", matched_coord.bold().bright_magenta());
+
+    // Return Result
+    matched_genome_name.to_string()
+
 }
 
 fn main() {
@@ -60,26 +128,28 @@ fn main() {
         .arg(
             Arg::new("genome")
                 .required(true)
+                .value_delimiter(',')
                 .help("FASTA file with genome to test"),
         )
         .get_matches();
 
     let path_variants = matches.get_one::<String>("variants").unwrap();
-    let path_genome = matches.get_one::<String>("genome").unwrap();
+    let path_genomes: Vec<String> = matches.get_many::<String>("genome").unwrap().cloned().collect();
 
-    // let path_genome = "inst/genome1.fasta";
-    // let path_variants = "inst/variants_0based.tsv";
-    assess_ref_genome_support(path_variants, path_genome)
-}
+    assess_ref_genomes_support(path_genomes, path_variants);
 
-fn assess_ref_genome_support(path_variants: &str, path_genome: &str) {
-    // Setup Paths
+}  
 
+fn assess_ref_genome_support(path_variants: &str, path_genome: &str) -> (String, RefGenomeMatches, Coordinate) {
+    
     // Create Reader
-    let reader_hg38 = rust_htslib::faidx::Reader::from_path(path_genome).unwrap_or_else(|_err| {
+    let reader = rust_htslib::faidx::Reader::from_path(path_genome).unwrap_or_else(|_err| {
         panic!("Failed to read genome file ({}). Missing file", path_genome)
     });
 
+    // Pull all valid chromosomes
+    let valid_chromosomes = get_all_chromosomes(&reader);
+    
     // Read TSV file
     // Create Reader
     let mut var_reader = csv::ReaderBuilder::new()
@@ -91,7 +161,6 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) {
 
     // Allow users to add column names (Will need to take from user input)
     // Note by default values will be None and the default valid names above will be used
-    // TODO pull from commandline
     let user_specified_chrom = None;
     let user_specified_pos = None;
     let user_specified_ref = None;
@@ -121,17 +190,18 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) {
     let col_pos = find_colname(headers, &pos_column_names);
     let col_ref = find_colname(headers, &ref_column_names);
 
-    println!("\n-------- TSV Col Names ---------");
-    println!("Chromosome: {}", col_chrom);
-    println!("Position: {}", col_pos);
-    println!("Reference: {}", col_ref);
+    // println!("\n-------- TSV Col Names ---------");
+    // println!("Chromosome: {}", col_chrom);
+    // println!("Position: {}", col_pos);
+    // println!("Reference: {}", col_ref);
 
     let valid_bases = ["A", "C", "T", "G"];
 
+    // Initialise some counts
     let mut n_variants_supporting_0base = 0;
     let mut n_variants_supporting_1base = 0;
+    let mut n_variants_with_chromosome_name_not_in_genome: i32 = 0;
     let mut n_variants_tested = 0;
-
     // Iterate Dataset
     for result in var_reader.deserialize() {
         // Parse Record
@@ -152,10 +222,19 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) {
             continue;
         }
 
-        //Collect Sequence Information ()
-        let ref_base = fetch_seq(&reader_hg38, record[&col_chrom].to_string(), pos, pos, true);
+        // Check if Chromosome Is in Ref genome 
+        // (We explicitly do this check before querying fasta as otherwise htslib will just error 
+        // when we try and fetch the sequence)
+        if !valid_chromosomes.contains(&record[&col_chrom].to_string()) {
+            n_variants_tested += 1;
+            n_variants_with_chromosome_name_not_in_genome += 1;
+            continue;
+        }
+
+        //Collect Sequence Information 
+        let ref_base = fetch_seq(&reader, record[&col_chrom].to_string(), pos, pos, true);
         let ref_base_if_1base = fetch_seq(
-            &reader_hg38,
+            &reader,
             record[&col_chrom].to_string(),
             pos_if_1base,
             pos_if_1base,
@@ -202,8 +281,8 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) {
 
     // Print Results
     println!(
-        "\n================================\nGenome: {:?}\n================================",
-        genome_filename
+        "\n\n{EQUALS_HEADER}\nGenome: {}\n{EQUALS_HEADER}",
+        genome_filename.to_owned().to_string_lossy().blue().bold()
     );
 
     println!("\n-------- Details --------");
@@ -215,9 +294,17 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) {
         "1-based matches to ref genome: {}/{}",
         n_variants_supporting_1base, n_variants_tested
     );
+    println!(
+        "Chromosome names missing from ref genome: {}/{}",
+        n_variants_with_chromosome_name_not_in_genome, n_variants_tested
+    );
+    
     println!("\n-------- Summary --------");
     println!("Coordinate System: {}", coord);
     println!("Reference Genome Matches: {}", ref_genome_matches);
+
+    let result_summary = (genome_filename.to_str().unwrap_or_default().to_string(), ref_genome_matches, coord);
+    result_summary
 }
 
 fn get_column_names<'a>(
@@ -256,4 +343,14 @@ fn fetch_seq(
 
     // Return String
     seq_string
+}
+
+
+fn get_all_chromosomes(reader: &rust_htslib::faidx::Reader) -> Vec<String>{
+    
+    // Identify all chromosomes 
+    let valid_chromosomes: Vec<String> = (0..reader.n_seqs()).map(|i| reader.seq_name(i as i32).unwrap()).collect();
+
+    // Return
+    valid_chromosomes
 }
