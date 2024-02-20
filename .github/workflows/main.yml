@@ -1,6 +1,6 @@
 name: Build Rust Projects with Cross
 on:
-  workflow_run
+  workflow_dispatch
 
 env:
   CRATE_NAME: genomeguesser
