@@ -13,7 +13,9 @@
 ## Limitations
 
 Identifying the exact reference genome for variant calling from a simple tabular is not always possible, especially with a limited set of variants and similar potential reference genomes. 
-Consider a scenario where you aim to discern whether the variants in your file correspond to hg19 or hg38. Providing only one of these genomes to Genome Guesser and a mere handful of variants (say, five) might lead the tool to affirm a match with the supplied genome. This outcome, while technically accurate—since no discrepancies with the provided reference were detected—might not reflect the complete picture. For a more robust verification, it's crucial to input all potential reference genomes into Genome Guesser. In the given example, this approach would reveal that the five variants align perfectly with both hg19 and hg38, rendering the results inconclusive. Hence, the key takeaway is that to truly determine the basis of your variant file with respect to one genome or another, it's advisable to test against all conceivable references in Genome Guesser and evaluate the degree of match across them.
+Consider a scenario where you aim to discern whether the variants in your file correspond to hg19 or hg38. Providing only one of these genomes to Genome Guesser and a mere handful of variants might lead the tool to affirm a match with the supplied genome. This outcome, while technically accurate since no discrepancies with the provided reference were detected might not reflect the complete picture. For a more robust verification, it's crucial to re-run Genome Guesser with each potential reference genome. In the given example, this approach would reveal that the five variants align perfectly with both hg19 and hg38, rendering the results inconclusive. 
+
+Hence, the key takeaway is that to truly determine the basis of your variant file with respect to one genome or another, it's advisable to test against all conceivable references in Genome Guesser and evaluate the degree of concordance across them.
 
 
 ## Getting Started
