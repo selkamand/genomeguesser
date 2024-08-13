@@ -1,8 +1,8 @@
 use clap::{command, Arg};
-use core::fmt;
-use std::string::String;
 use colored::Colorize;
+use core::fmt;
 use csv::StringRecord;
+use std::string::String;
 
 //type VarRecord = (String, usize, String);
 type VarRecord = std::collections::HashMap<String, String>;
@@ -22,7 +22,11 @@ impl fmt::Display for Coordinate {
         match self {
             Coordinate::Zero => write!(f, "{}", "0-based ✅".bold().green()),
             Coordinate::One => write!(f, "{}", "1-based ✅".bold().green()),
-            Coordinate::Unsure => write!(f, "{}" ,format!("{} {}",SHRUGGING_MAN.bold(), "(Unclear)").yellow()),
+            Coordinate::Unsure => write!(
+                f,
+                "{}",
+                format!("{} {}", SHRUGGING_MAN.bold(), "(Unclear)").yellow()
+            ),
         }
     }
 }
@@ -39,80 +43,99 @@ impl fmt::Display for RefGenomeMatches {
         match self {
             RefGenomeMatches::Yes => write!(f, "{}", "Perfectly aligns ✅".bold().green()),
             RefGenomeMatches::No => write!(f, "{}", "No, Ref mismatches found ❌".bold().red()),
-            RefGenomeMatches::Unsure => write!(f, "{}", format!("{} {}",SHRUGGING_MAN.bold(), "(Unclear)").yellow()),
+            RefGenomeMatches::Unsure => write!(
+                f,
+                "{}",
+                format!("{} {}", SHRUGGING_MAN.bold(), "(Unclear)").yellow()
+            ),
         }
     }
 }
 
 fn assess_ref_genomes_support(path_genomes: Vec<String>, path_variants: &str) -> String {
+    let results: Vec<(String, RefGenomeMatches, Coordinate)> = path_genomes
+        .iter()
+        .map(|genome| assess_ref_genome_support(path_variants, genome))
+        .collect();
 
-    
-    let results: Vec<(String, RefGenomeMatches, Coordinate)> = path_genomes.iter().map(|genome| { assess_ref_genome_support(path_variants, genome) }).collect();
-    
-    let genome_matches: Vec<RefGenomeMatches> = results.iter().map(|tup| tup.1.clone() ).collect();
-    let results_coord: Vec<Coordinate> = results.iter().map(|tup: &(String, RefGenomeMatches, Coordinate)| tup.2.clone() ).collect();
+    let genome_matches: Vec<RefGenomeMatches> = results.iter().map(|tup| tup.1.clone()).collect();
+    let results_coord: Vec<Coordinate> = results
+        .iter()
+        .map(|tup: &(String, RefGenomeMatches, Coordinate)| tup.2.clone())
+        .collect();
 
-
-    let ref_genome_matched: Vec<bool> = genome_matches.iter().map(|ref_match| match ref_match{
-        RefGenomeMatches::Yes => true,
-        RefGenomeMatches::No => false,
-        RefGenomeMatches::Unsure => false}
-    ).collect();
+    let ref_genome_matched: Vec<bool> = genome_matches
+        .iter()
+        .map(|ref_match| match ref_match {
+            RefGenomeMatches::Yes => true,
+            RefGenomeMatches::No => false,
+            RefGenomeMatches::Unsure => false,
+        })
+        .collect();
 
     let num_matches = ref_genome_matched.iter().filter(|x| **x).count();
     let mut final_result = "Unsure";
 
-    if num_matches == 0{
+    if num_matches == 0 {
         final_result = "no matches";
-    }
-    else if num_matches == 1{
+    } else if num_matches == 1 {
         final_result = "1 match";
-    }
-    else if num_matches > 1{
+    } else if num_matches > 1 {
         final_result = "Ambiguous, multiple matches";
     }
 
     // Collect Genome Names
     let matched_genome_name: String;
     let matched_coord: String;
-    let genome_names: Vec<String> = path_genomes.iter().map(|genome_path| {
-        std::path::Path::new(genome_path.to_string().as_str())
-            .file_name().map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| panic!("Failed to parse genome path as filepath"))
-    }).collect();
-    
-    // 
-    if final_result == "1 match"{
-        let index_of_matched = ref_genome_matched.iter().enumerate()
-        .find_map(|(i, &value)| if value { Some(i) } else { None })
-        .expect("No match found, but expected one match");
+    let genome_names: Vec<String> = path_genomes
+        .iter()
+        .map(|genome_path| {
+            std::path::Path::new(genome_path.to_string().as_str())
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| panic!("Failed to parse genome path as filepath"))
+        })
+        .collect();
 
-    // Access the matched genome name safely
-    matched_genome_name = genome_names.get(index_of_matched).unwrap().to_string();
-    matched_coord = results_coord.get(index_of_matched).unwrap().to_string();
-    
+    //
+    if final_result == "1 match" {
+        let index_of_matched = ref_genome_matched
+            .iter()
+            .enumerate()
+            .find_map(|(i, &value)| if value { Some(i) } else { None })
+            .expect("No match found, but expected one match");
 
-    }
-    else if final_result == "Ambiguous, multiple matches" {
-        matched_genome_name = r"¯\_(ツ)_/¯ (Variant file works equally well for multiple variants)".to_string();
+        // Access the matched genome name safely
+        matched_genome_name = genome_names.get(index_of_matched).unwrap().to_string();
+        matched_coord = results_coord.get(index_of_matched).unwrap().to_string();
+    } else if final_result == "Ambiguous, multiple matches" {
+        matched_genome_name =
+            r"¯\_(ツ)_/¯ (Variant file works equally well for multiple variants)".to_string();
         matched_coord = Coordinate::Unsure.to_string();
-    }
-    else if final_result == "no matches" {
-        matched_genome_name = r"¯\_(ツ)_/¯ (No unambiguous matches to any reference genome)".to_string();
+    } else if final_result == "no matches" {
+        matched_genome_name =
+            r"¯\_(ツ)_/¯ (No unambiguous matches to any reference genome)".to_string();
         matched_coord = Coordinate::Unsure.to_string();
-    }
-    else  {
+    } else {
         panic!("Should never see this. If you are developer has added 'final_result' possibilities and not accounted for them")
     }
 
     //Print Details
-    println!("\n\n{EQUALS_HEADER}\n{}\n{EQUALS_HEADER}", "Final Summary".bold().blue());
-    println!("Matched reference genome: {} ✅", matched_genome_name.bold().bright_magenta());
-    println!("Coordinate system genome: {}", matched_coord.bold().bright_magenta());
+    println!(
+        "\n\n{EQUALS_HEADER}\n{}\n{EQUALS_HEADER}",
+        "Final Summary".bold().blue()
+    );
+    println!(
+        "Matched reference genome: {} ✅",
+        matched_genome_name.bold().bright_magenta()
+    );
+    println!(
+        "Coordinate system genome: {}",
+        matched_coord.bold().bright_magenta()
+    );
 
     // Return Result
     matched_genome_name.to_string()
-
 }
 
 fn main() {
@@ -123,7 +146,7 @@ fn main() {
         .arg(
             Arg::new("variants")
                 .required(true)
-                .help("TSV file with Variants"),
+                .help("TSV file with variants. Expects columns: 'Chrom', 'Pos', and 'Ref', but will also look for synonymous column names"),
         )
         .arg(
             Arg::new("genome")
@@ -134,14 +157,19 @@ fn main() {
         .get_matches();
 
     let path_variants = matches.get_one::<String>("variants").unwrap();
-    let path_genomes: Vec<String> = matches.get_many::<String>("genome").unwrap().cloned().collect();
+    let path_genomes: Vec<String> = matches
+        .get_many::<String>("genome")
+        .unwrap()
+        .cloned()
+        .collect();
 
     assess_ref_genomes_support(path_genomes, path_variants);
+}
 
-}  
-
-fn assess_ref_genome_support(path_variants: &str, path_genome: &str) -> (String, RefGenomeMatches, Coordinate) {
-    
+fn assess_ref_genome_support(
+    path_variants: &str,
+    path_genome: &str,
+) -> (String, RefGenomeMatches, Coordinate) {
     // Create Reader
     let reader = rust_htslib::faidx::Reader::from_path(path_genome).unwrap_or_else(|_err| {
         panic!("Failed to read genome file ({}). Missing file", path_genome)
@@ -149,7 +177,7 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) -> (String,
 
     // Pull all valid chromosomes
     let valid_chromosomes = get_all_chromosomes(&reader);
-    
+
     // Read TSV file
     // Create Reader
     let mut var_reader = csv::ReaderBuilder::new()
@@ -222,8 +250,8 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) -> (String,
             continue;
         }
 
-        // Check if Chromosome Is in Ref genome 
-        // (We explicitly do this check before querying fasta as otherwise htslib will just error 
+        // Check if Chromosome Is in Ref genome
+        // (We explicitly do this check before querying fasta as otherwise htslib will just error
         // when we try and fetch the sequence)
         if !valid_chromosomes.contains(&record[&col_chrom].to_string()) {
             n_variants_tested += 1;
@@ -231,7 +259,7 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) -> (String,
             continue;
         }
 
-        //Collect Sequence Information 
+        //Collect Sequence Information
         let ref_base = fetch_seq(&reader, record[&col_chrom].to_string(), pos, pos, true);
         let ref_base_if_1base = fetch_seq(
             &reader,
@@ -298,12 +326,16 @@ fn assess_ref_genome_support(path_variants: &str, path_genome: &str) -> (String,
         "Chromosome names missing from ref genome: {}/{}",
         n_variants_with_chromosome_name_not_in_genome, n_variants_tested
     );
-    
+
     println!("\n-------- Summary --------");
     println!("Coordinate System: {}", coord);
     println!("Reference Genome Matches: {}", ref_genome_matches);
 
-    let result_summary = (genome_filename.to_str().unwrap_or_default().to_string(), ref_genome_matches, coord);
+    let result_summary = (
+        genome_filename.to_str().unwrap_or_default().to_string(),
+        ref_genome_matches,
+        coord,
+    );
     result_summary
 }
 
@@ -345,11 +377,11 @@ fn fetch_seq(
     seq_string
 }
 
-
-fn get_all_chromosomes(reader: &rust_htslib::faidx::Reader) -> Vec<String>{
-    
-    // Identify all chromosomes 
-    let valid_chromosomes: Vec<String> = (0..reader.n_seqs()).map(|i| reader.seq_name(i as i32).unwrap()).collect();
+fn get_all_chromosomes(reader: &rust_htslib::faidx::Reader) -> Vec<String> {
+    // Identify all chromosomes
+    let valid_chromosomes: Vec<String> = (0..reader.n_seqs())
+        .map(|i| reader.seq_name(i as i32).unwrap())
+        .collect();
 
     // Return
     valid_chromosomes
