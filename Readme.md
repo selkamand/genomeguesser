@@ -45,7 +45,9 @@ Options:
 
 ### How do I check the reference genome of a VCF file?
 
-We don't natively support VCFs as most VCF headers will explicitly indicate the reference genome used, and they always use 1-based coordinate systems. However, if your VCF header does not include this information, you can convert it to a tsv using `bcftools` (you may need to replace `sed` with `gsed` if using MacOS)
+Genome Guesser does not natively support VCFs since they typically include a header with reference genome details, and always use a 1-based coordinate system.
+
+We don't natively support VCFs as most VCF headers will explicitly indicate the reference genome used, and they always use 1-based coordinate systems. However, if your VCF header lacks this information, you can convert it to TSV using bcftools and then test it with genome guesser. Note that in the example below, you may need to replace `sed` with `gsed` on macOS.
 
 ```
 bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\n' example.vcf | sed  1i"Chrom\tPos\tRef\tAlt" > example.tsv
