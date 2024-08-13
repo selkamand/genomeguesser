@@ -30,7 +30,7 @@ To use Genome Guesser, run the following command:
 genomeguesser <variants> <genome>
 
 Arguments:
-  <variants>  TSV file with Variants
+  <variants>  TSV file with variants. Expects columns: 'Chrom', 'Pos', and 'Ref', but will also look for synonymous column names
   <genome>    FASTA file with genome to test
 
 Options:
