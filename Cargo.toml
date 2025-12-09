@@ -9,7 +9,7 @@ description = "Identifying the reference genome used for variant calling and det
 [package.metadata.wix]
 upgrade-guid = "18D4069C-FF85-46A5-82DD-41BA349C7773"
 path-guid = "179E52C2-A17A-49CA-91FD-A7A2AE1AEFC4"
-license = false
+license = "MIT"
 eula = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
