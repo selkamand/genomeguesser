@@ -5,6 +5,7 @@ edition = "2021"
 repository = "https://github.com/selkamand/genomeguesser"
 authors = ["Sam El-Kamand <selkamand@ccia.org.au>"]
 description = "Identifying the reference genome used for variant calling and determining whether variant positions are from a 0-based or 1-based coordinate system"
+license = "MIT"
 
 [package.metadata.wix]
 upgrade-guid = "18D4069C-FF85-46A5-82DD-41BA349C7773"
